@@ -133,7 +133,6 @@ body { font-family:'Malgun Gothic','Apple SD Gothic Neo',sans-serif; background:
   <div class="ko-meaning" id="d-ko"></div>
   <div class="drag-tip">💡 단어를 터치해 넣거나, 꾹 눌러서 <b>드래그</b>로 순서를 바꿀 수 있어요!</div>
   <div id="answer-area"></div><div id="scramble-area"></div>
-        <button class="primary-btn blue" style="margin-top:8px" onclick="manualCheckDict()">정답 확인 / 다음 문장 ➔</button>
   <div class="audio-row"><button id="speed-btn" class="audio-btn speed-btn" onclick="toggleSpeed()">🐇 보통 속도</button><button id="play-btn" class="audio-btn play-btn" onclick="toggleAudio()">▶️ 원어민 음성 재생</button></div>
 </div>
 
@@ -222,14 +221,6 @@ function normalizeSentence(s){
         .replace(/[’‘]/g,"'")
         .replace(/[“”]/g,'"')
         .replace(/[^a-z0-9]/g,'');
-}
-function manualCheckDict(){
-    const sa=document.getElementById('scramble-area');
-    if(sa.children.length>0){
-        alert('아래 단어를 모두 위 답안 칸으로 옮긴 뒤 확인하세요.');
-        return;
-    }
-    checkDict();
 }
 function checkDict(){
     if(dictMoving) return;
