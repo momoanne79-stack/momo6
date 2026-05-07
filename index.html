@@ -133,6 +133,7 @@ body { font-family:'Malgun Gothic','Apple SD Gothic Neo',sans-serif; background:
   <div class="ko-meaning" id="d-ko"></div>
   <div class="drag-tip">💡 단어를 터치해 넣거나, 꾹 눌러서 <b>드래그</b>로 순서를 바꿀 수 있어요!</div>
   <div id="answer-area"></div><div id="scramble-area"></div>
+        <button class="primary-btn blue" style="margin-top:8px" onclick="manualCheckDict()">정답 확인 / 다음 문장 ➔</button>
   <div class="audio-row"><button id="speed-btn" class="audio-btn speed-btn" onclick="toggleSpeed()">🐇 보통 속도</button><button id="play-btn" class="audio-btn play-btn" onclick="toggleAudio()">▶️ 원어민 음성 재생</button></div>
 </div>
 
@@ -207,15 +208,46 @@ function handleWord(btn,ok,div,q){ if(wBusy) return; wBusy=true; showCombo(ok); 
 function finishWord(early=false){ const tot=early?wIdx:wList.length; if(tot===0){resetWord();return;} const sc=Math.round(wOK/tot*100); updateEvo('wevo-',wIdx,wList.length); setTimeout(()=>{ document.getElementById('word-quiz').style.display='none'; document.getElementById('word-result').style.display='block'; document.getElementById('w-res-e').innerText=sc>=90?'🐉✨':sc>=70?'🐲':'🦖💦'; document.getElementById('w-score').innerText=sc+'점'; document.getElementById('w-detail').innerText=`정답: ${wOK}개 / ${tot}문항`; saveHist('word',{score:sc,correct:wOK,total:tot}); if(!early&&sc>=90) boom(); },500); }
 function resetWord(){ document.getElementById('word-result').style.display='none'; document.getElementById('word-intro').style.display='block'; }
 
-let dIdx=0,isLoop=false,loopTimer=null,dictLoaded=false;
+let dIdx=0,isLoop=false,loopTimer=null,dictLoaded=false,dictMoving=false;
 const speeds=[.78,.62,.5], sLabels=['🐇 보통 속도','🐢 느리게','🐌 아주 느리게']; let spIdx=0;
 function loopPlay(){ if(!isLoop||!sentenceList.length) return; speak(sentenceList[dIdx].en,speeds[spIdx],()=>{ if(isLoop) loopTimer=setTimeout(loopPlay,1000); }); }
 function stopLoop(){ isLoop=false; window.speechSynthesis.cancel(); clearTimeout(loopTimer); }
 function toggleAudio(){ if(isLoop) stopLoop(); else{isLoop=true;loopPlay();} updatePlayBtn(); }
 function updatePlayBtn(){ const b=document.getElementById('play-btn'); if(!b) return; b.innerHTML=isLoop?'⏸️ 음성 반복 멈춤':'▶️ 원어민 음성 재생'; b.className='audio-btn play-btn'+(isLoop?' playing':''); }
 function toggleSpeed(){ spIdx=(spIdx+1)%speeds.length; document.getElementById('speed-btn').innerHTML=sLabels[spIdx]; if(isLoop){stopLoop();isLoop=true;loopPlay();} }
-function loadDict(){ if(!sentenceList.length) return; stopLoop(); updateEvo('devo-',dIdx,sentenceList.length); const s=sentenceList[dIdx]; document.getElementById('d-status').innerText=`영작 문제 ${dIdx+1} / ${sentenceList.length}`; document.getElementById('d-ko').innerText=s.ko; const aa=document.getElementById('answer-area'); aa.innerHTML=''; aa.style.background='var(--light)'; aa.style.borderColor='var(--main)'; const sa=document.getElementById('scramble-area'); sa.innerHTML=''; shuffle(s.en.split(' ').filter(w=>w)).forEach(w=>{ const b=document.createElement('button'); b.className='word-chip'; b.innerText=w; b.onclick=function(){ if(this.parentElement.id==='scramble-area') aa.appendChild(this); else sa.appendChild(this); if(sa.children.length===0) checkDict(); }; sa.appendChild(b); }); if(!window._ds){ window._ds=new Sortable(aa,{animation:280,ghostClass:'sortable-ghost',dragClass:'sortable-drag',swapThreshold:.65,onEnd:()=>{ if(document.getElementById('scramble-area').children.length===0) checkDict(); }}); } isLoop=true; loopPlay(); updatePlayBtn(); }
-function checkDict(){ const aa=document.getElementById('answer-area'); const student=Array.from(aa.children).map(b=>b.innerText.trim()).join(' '); const norm=s=>s.toLowerCase().replace(/[^a-z0-9]/g,''); if(norm(student)===norm(sentenceList[dIdx].en)){ sfxOK(); showCombo(true); aa.style.background='#d4edda'; aa.style.borderColor='var(--green)'; recDict(); stopLoop(); updatePlayBtn(); setTimeout(()=>nextDict(),700); } else { sfxNG(); showCombo(false); aa.style.background='#fde8e8'; setTimeout(()=>aa.style.background='var(--light)',400); } }
+function loadDict(){ if(!sentenceList.length) return; dictMoving=false; stopLoop(); updateEvo('devo-',dIdx,sentenceList.length); const s=sentenceList[dIdx]; document.getElementById('d-status').innerText=`영작 문제 ${dIdx+1} / ${sentenceList.length}`; document.getElementById('d-ko').innerText=s.ko; const aa=document.getElementById('answer-area'); aa.innerHTML=''; aa.style.background='var(--light)'; aa.style.borderColor='var(--main)'; const sa=document.getElementById('scramble-area'); sa.innerHTML=''; shuffle(s.en.split(' ').filter(w=>w)).forEach(w=>{ const b=document.createElement('button'); b.className='word-chip'; b.innerText=w; b.onclick=function(){ if(this.parentElement.id==='scramble-area') aa.appendChild(this); else sa.appendChild(this); if(sa.children.length===0) checkDict(); }; sa.appendChild(b); }); if(!window._ds){ window._ds=new Sortable(aa,{animation:280,ghostClass:'sortable-ghost',dragClass:'sortable-drag',swapThreshold:.65,onEnd:()=>{ if(document.getElementById('scramble-area').children.length===0) checkDict(); }}); } isLoop=true; loopPlay(); updatePlayBtn(); }
+function normalizeSentence(s){
+    return String(s||'')
+        .toLowerCase()
+        .replace(/[’‘]/g,"'")
+        .replace(/[“”]/g,'"')
+        .replace(/[^a-z0-9]/g,'');
+}
+function manualCheckDict(){
+    const sa=document.getElementById('scramble-area');
+    if(sa.children.length>0){
+        alert('아래 단어를 모두 위 답안 칸으로 옮긴 뒤 확인하세요.');
+        return;
+    }
+    checkDict();
+}
+function checkDict(){
+    if(dictMoving) return;
+    const aa=document.getElementById('answer-area');
+    const student=Array.from(aa.children).map(b=>b.innerText.trim()).join(' ');
+    const answer=sentenceList[dIdx].en;
+    if(normalizeSentence(student)===normalizeSentence(answer)){
+        dictMoving=true;
+        try { sfxOK(); showCombo(true); recDict(); stopLoop(); updatePlayBtn(); } catch(e) { console.warn(e); }
+        aa.style.background='#d4edda';
+        aa.style.borderColor='var(--green)';
+        setTimeout(()=>{ dictMoving=false; nextDict(); },650);
+    } else {
+        sfxNG(); showCombo(false);
+        aa.style.background='#fde8e8';
+        setTimeout(()=>aa.style.background='var(--light)',450);
+    }
+}
 function nextDict(){ if(dIdx+1<sentenceList.length){dIdx++; loadDict();} else {stopLoop(); updatePlayBtn(); updateEvo('devo-',sentenceList.length,sentenceList.length); boom(); setTimeout(()=>alert('수리나무 마스터 달성! 영작 훈련 완료! 🐉🎉'),300);} }
 function jumpTo(){ const n=parseInt(document.getElementById('jumpNum').value); if(n>=1&&n<=sentenceList.length){dIdx=n-1;comboCount=0;loadDict();} else alert(`1~${sentenceList.length} 사이 번호를 입력하세요.`); }
 function recDict(){ const dk=todayKey(); let h=JSON.parse(localStorage.getItem(STORE+'_dict')||'{}'); if(!h[dk]) h[dk]={count:0}; h[dk].count++; localStorage.setItem(STORE+'_dict',JSON.stringify(h)); }
